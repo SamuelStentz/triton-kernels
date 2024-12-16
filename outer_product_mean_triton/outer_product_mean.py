@@ -6,40 +6,45 @@ from torch.nn import Module
 import triton
 import triton.language as tl
 
-#DEVICE = triton.runtime.driver.active.get_active_torch_device()
+# DEVICE = triton.runtime.driver.active.get_active_torch_device()
 
-class OuterProductMean(Module):
+
+class Fast_OuterProductMean(Module):
     """
     Compute mean_s(a_si ⊗ b_sj), the mean of outer products over the sequence dimension.
 
     Args:
-        a: Tensor of shape [*, s, i]
-        b: Tensor of shape [*, s, j]
+        a: Tensor of shape [s, i]
+        b: Tensor of shape [s, j]
 
     Returns:
-        Tensor of shape [*, i, j], the mean of the outer products.
+        Tensor of shape [i, j], the mean of the outer products.
     """
 
     def __init__(self):
         super().__init__()
 
     def forward(self, a: Tensor, b: Tensor) -> Tensor:
-        output = torch.zeros((a.size(-1), b.size(-1)))
-        assert a.size(-2) == b.size(-2)
-        
         S, M = a.shape
-        _, N = b.shape
-        #assert a.device == DEVICE and b.device == DEVICE and output.device == DEVICE
-
+        S_2, N = b.shape
         MAX_FUSED_SIZE = 65536 // a.element_size()
-        BLOCK_SIZE = MAX_FUSED_SIZE // (M * N) 
-        print(f"BLOCK_SIZE: {BLOCK_SIZE}")
 
-        # 1D Grid across sequence
-        def grid(meta):
-            return triton.cdiv(a.size(-2), meta["BLOCK_SIZE"]),
+        assert S == S_2
+        assert S == triton.next_power_of_2(S)
+        assert S <= MAX_FUSED_SIZE
 
-        _mean_outer_product_fwd[grid](a, b, output, a.size(-2), BLOCK_SIZE)
+        # 2D Grid
+        def grid(_):
+            return (M, N)
+
+        a = a.contiguous()
+        b = b.contiguous()
+        output = torch.zeros((M, N), device="cuda:0").contiguous()
+        
+        # assert a.device == DEVICE and b.device == DEVICE and output.device == DEVICE
+        _mean_outer_product_fwd[grid](
+            a, b, output, S, a.stride(0), b.stride(0), output.stride(0)
+        )
         return output
 
 
@@ -48,41 +53,36 @@ def _mean_outer_product_fwd(
     A,  # pointer to first input A (S, M)
     B,  # pointer to second input B (S, N)
     Output,  # pointer to output vector O (M, N)
-    S,  # Averaged dimension
-    BLOCK_SIZE: tl.constexpr,
+    a_stride: tl.constexpr,
+    b_stride: tl.constexpr,
+    o_stride: tl.constexpr,
+    S: tl.constexpr,
 ):
-    # Map the program id to the row of X and Y it should compute.
-    row = tl.program_id(0)
+    # Map the program id to Output_ij to compute
+    i = tl.program_id(0)
+    j = tl.program_id(1)
 
-    # Select tile of A and B across S
-    print(A)
-    offsets = row * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
-    mask = offsets < S
-    a = tl.load(A + offsets, mask=mask, other=0).to(tl.float32)  # (BLOCK_SIZE, M)
-    b = tl.load(B + offsets, mask=mask, other=0).to(tl.float32)  # (BLOCK_SIZE, N)
+    # Select A_i, B_j
+    a_offsets = tl.arange(0, S) * a_stride + i
+    b_offsets = tl.arange(0, S) * b_stride + j
+    a = tl.load(A + a_offsets).to(tl.float32)
+    b = tl.load(B + b_offsets).to(tl.float32)
 
-    #print(a)
-
-    # Compute outer product
-    a = tl.expand_dims(a, axis=1)
-    b = tl.expand_dims(b, axis=0)
-    outer_product = tl.dot(a, b)  # (BLOCK_SIZE, M, N)
-    averaged_outer_product = tl.sum(outer_product, 0) / S  # (M, N)
-    # TODO: How to do this sum into shared entries of output tensor.
-    tl.store(averaged_outer_product, Output, mask=mask)
+    # Compute Output_ij = mean(a ∘ b)
+    result = tl.sum(a * b, axis=0) / S
+    o = Output + i * o_stride + j
+    tl.store(o, result)
 
 
 @triton.jit
 def _mean_outer_product_bwd_dA(
     DA,  # pointer to the A gradient
     DO,  # pointer to the O gradient
-    A,  # pointer to A
-    B,  # pointer to B
-    stride,  # how much to increase the pointer when moving by 1 row
-    S,  # Averaged dimension
-    M,  # Last dimension of A
-    N,  # Last dimension of B
-    GROUP_SIZE_S: tl.constexpr,
+    A,  # pointer to first input A (M, S)
+    B,  # pointer to second input B (N, S)
+    S: tl.constexpr,
+    M: tl.constexpr,
+    N: tl.constexpr,
 ):
     print("_mean_outer_product_bwd_dA unimplemented")
 
@@ -91,12 +91,10 @@ def _mean_outer_product_bwd_dA(
 def _mean_outer_product_bwd_dB(
     DB,  # pointer to the A gradient
     DO,  # pointer to the O gradient
-    A,  # pointer to A
-    B,  # pointer to B
-    stride,  # how much to increase the pointer when moving by 1 row
-    S,  # Averaged dimension
-    M,  # Last dimension of A
-    N,  # Last dimension of B
-    GROUP_SIZE_S: tl.constexpr,
+    A,  # pointer to first input A (M, S)
+    B,  # pointer to second input B (N, S)
+    S: tl.constexpr,
+    M: tl.constexpr,
+    N: tl.constexpr,
 ):
     print("_mean_outer_product_bwd_dA unimplemented")

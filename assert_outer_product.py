@@ -2,60 +2,47 @@ import click
 
 import torch
 
-from outer_product_mean_pytorch.outer_product_mean import (
-    OuterProductMean
-)
+from outer_product_mean_triton.outer_product_mean import Fast_OuterProductMean
+from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
 
 # variables
 
 @click.command()
-@click.option('--seq-len', default = 16384) # 16384
-@click.option('--i', default = 768) # 768
-@click.option('--j', default = 768) # 768
+@click.option('--seq-len', default = 16) # 16384
+@click.option('--i', default = 2) # 768
+@click.option('--j', default = 3) # 768
 @click.option('--hidden', default = 32) # 32
-@click.option('--cuda-kernel', is_flag = True)
 def test(
     seq_len: int,
     i: int,
     j: int,
-    hidden: int,
-    cuda_kernel: bool,
+    hidden: int
 ):
     # inputs a, b
-
-    a = torch.randn(1, seq_len, i, hidden)
-    b = torch.randn(1, seq_len, j, hidden)
+    a = torch.randn(seq_len, i).cuda()
+    b = torch.randn(seq_len, j).cuda()
 
     # kernel and regular inputs
-
     ka = a.clone().requires_grad_()
     kb = b.clone().requires_grad_()
-
     ra = a.clone().requires_grad_()
     rb = b.clone().requires_grad_()
 
     # instantiate
-
     opm = OuterProductMean()
-    # TODO
-    #kopm = OuterProductMean(kernel = True)
+    kopm = Fast_OuterProductMean()
 
     # forward
-
-    # TODO
-    #ko = kopm(a, b)
     ro = opm(ra, rb)
-
-    #assert torch.allclose(ro, ko, atol = 1e-6)
+    ko = kopm(ka, kb)
+    print(ro)
+    print(ko)
+    assert torch.allclose(ro, ko, atol = 1e-6)
 
     # backwards
 
-    ro.sum().backward()
-    print(ro)
-    # TODO
+    #ro.sum().backward()
     #ko.sum().backward()
-
-    # TODO
     #assert torch.allclose(rq.grad, fq.grad, atol = 1e-6)
     #assert torch.allclose(rk.grad, fk.grad, atol = 1e-6)
     #assert torch.allclose(rv.grad, fv.grad, atol = 1e-6)
