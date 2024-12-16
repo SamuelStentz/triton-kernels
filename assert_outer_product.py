@@ -9,10 +9,10 @@ from outer_product_mean_pytorch.outer_product_mean import (
 # variables
 
 @click.command()
-@click.option('--seq-len', default = 2) # 16384
-@click.option('--i', default = 3) # 768
-@click.option('--j', default = 3) # 768
-@click.option('--hidden', default = 2) # 32
+@click.option('--seq-len', default = 16384) # 16384
+@click.option('--i', default = 768) # 768
+@click.option('--j', default = 768) # 768
+@click.option('--hidden', default = 32) # 32
 @click.option('--cuda-kernel', is_flag = True)
 def test(
     seq_len: int,
