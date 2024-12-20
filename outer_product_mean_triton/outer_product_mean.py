@@ -37,8 +37,6 @@ class Fast_OuterProductMean(Module):
         def grid(_):
             return (M, N)
 
-        a = a.contiguous()
-        b = b.contiguous()
         output = torch.zeros((M, N), device="cuda:0").contiguous()
         
         # assert a.device == DEVICE and b.device == DEVICE and output.device == DEVICE

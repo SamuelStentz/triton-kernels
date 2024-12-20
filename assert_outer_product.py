@@ -8,9 +8,9 @@ from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
 # variables
 
 @click.command()
-@click.option('--seq-len', default = 16) # 16384
-@click.option('--i', default = 2) # 768
-@click.option('--j', default = 3) # 768
+@click.option('--seq-len', default = 16384) # 16384
+@click.option('--i', default = 128) # 768
+@click.option('--j', default = 128) # 768
 @click.option('--hidden', default = 32) # 32
 def test(
     seq_len: int,
