@@ -43,7 +43,7 @@ class Fast_OuterProductMean(Module):
         
         # assert a.device == DEVICE and b.device == DEVICE and output.device == DEVICE
         _mean_outer_product_fwd[grid](
-            a, b, output, S, a.stride(0), b.stride(0), output.stride(0)
+            a, b, output, a.stride(0), b.stride(0), output.stride(0), S
         )
         return output
 
