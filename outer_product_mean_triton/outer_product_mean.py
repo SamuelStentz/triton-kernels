@@ -40,6 +40,8 @@ class Fast_OuterProductMean(Module):
         output = torch.zeros((M, N), device="cuda:0").contiguous()
         
         # assert a.device == DEVICE and b.device == DEVICE and output.device == DEVICE
+        a = torch.transpose(a, -1, -2).contiguous()
+        b = torch.transpose(b, -1, -2).contiguous()
         _mean_outer_product_fwd[grid](
             a, b, output, a.stride(0), b.stride(0), output.stride(0), S
         )
@@ -48,12 +50,12 @@ class Fast_OuterProductMean(Module):
 
 @triton.jit
 def _mean_outer_product_fwd(
-    A,  # pointer to first input A (S, M)
-    B,  # pointer to second input B (S, N)
+    A,  # pointer to first input A (M, S)
+    B,  # pointer to second input B (N, S)
     Output,  # pointer to output vector O (M, N)
-    a_stride: tl.constexpr,
-    b_stride: tl.constexpr,
-    o_stride: tl.constexpr,
+    a_stride,
+    b_stride,
+    o_stride,
     S: tl.constexpr,
 ):
     # Map the program id to Output_ij to compute
@@ -61,8 +63,8 @@ def _mean_outer_product_fwd(
     j = tl.program_id(1)
 
     # Select A_i, B_j
-    a_offsets = tl.arange(0, S) * a_stride + i
-    b_offsets = tl.arange(0, S) * b_stride + j
+    a_offsets = tl.arange(0, S) + i * a_stride
+    b_offsets = tl.arange(0, S) + j * b_stride
     a = tl.load(A + a_offsets).to(tl.float32)
     b = tl.load(B + b_offsets).to(tl.float32)
 

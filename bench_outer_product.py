@@ -19,8 +19,8 @@ from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
         args={},
     ))
 def benchmark(seq_len, provider):
-    a = torch.rand(seq_len, 1024, dtype=torch.float32).cuda()
-    b = torch.rand(seq_len, 1, dtype=torch.float32).cuda()
+    a = torch.rand(seq_len, 128, dtype=torch.float32).cuda()
+    b = torch.rand(seq_len, 128, dtype=torch.float32).cuda()
     quantiles = [0.5, 0.2, 0.8]
     if provider == 'torch':
         opm = OuterProductMean()
