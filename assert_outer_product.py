@@ -8,15 +8,13 @@ from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
 # variables
 
 @click.command()
-@click.option('--seq-len', default = 16) # 16384
-@click.option('--i', default = 2) # 768
-@click.option('--j', default = 3) # 768
-@click.option('--hidden', default = 32) # 32
+@click.option('--seq-len', default = 16384) # 16384
+@click.option('--i', default = 16) # 768
+@click.option('--j', default = 16) # 768
 def test(
     seq_len: int,
     i: int,
     j: int,
-    hidden: int
 ):
     # inputs a, b
     a = torch.randn(seq_len, i).cuda()
@@ -35,8 +33,6 @@ def test(
     # forward
     ro = opm(ra, rb)
     ko = kopm(ka, kb)
-    print(ro)
-    print(ko)
     assert torch.allclose(ro, ko, atol = 1e-6)
 
     # backwards
