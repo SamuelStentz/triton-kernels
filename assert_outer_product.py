@@ -2,16 +2,15 @@ import click
 
 import torch
 
-from outer_product_mean_triton.outer_product_mean import Fast_OuterProductMean
-from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
-
+from outer_product_mean.outer_product_mean import OuterProductMean
 # variables
 
+
 @click.command()
-@click.option('--batch', default = 16)
-@click.option('--seq-len', default = 256) # 16384
-@click.option('--m', default = 32) # 768
-@click.option('--n', default = 16) # 768
+@click.option("--batch", default=16)
+@click.option("--seq-len", default=256)  # 16384
+@click.option("--m", default=32)  # 768
+@click.option("--n", default=16)  # 768
 def test(
     batch: int,
     seq_len: int,
@@ -31,20 +30,23 @@ def test(
 
     # instantiate
     opm = OuterProductMean()
-    kopm = Fast_OuterProductMean()
+    kopm = OuterProductMean()
 
     # forward
-    RO = opm(RA, RB)
-    KO = kopm(KA, KB)
-    assert torch.allclose(RO, KO, atol = 1e-6)
+    RO = opm.forward(RA, RB)
+    KO = kopm.forward(KA, KB, use_triton_kernel=True)
+    assert torch.allclose(RO, KO, atol=1e-6)
 
     # backwards
     RO.backward(dO)
     KO.backward(dO)
-    assert torch.allclose(RA.grad, KA.grad, atol = 1e-6)
-    assert torch.allclose(RB.grad, KB.grad, atol = 1e-6)
+    assert torch.allclose(RA.grad, KA.grad, atol=1e-6)
+    assert torch.allclose(RB.grad, KB.grad, atol=1e-6)
 
-    print('✅ outputs and gradients are same between regular and kernel mean outer product')
+    print(
+        "✅ outputs and gradients are same between regular and kernel mean outer product"
+    )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     test()
