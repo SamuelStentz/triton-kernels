@@ -24,7 +24,13 @@ class Fast_OuterProductMean(Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, ctx, a: Tensor, b: Tensor) -> Tensor:
+    def forward(self, a: Tensor, b: Tensor) -> Tensor:
+        return FastOuterProductMeanFunction.apply(a, b)
+
+
+class FastOuterProductMeanFunction(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, a: Tensor, b: Tensor):
         ctx.save_for_backward(a, b)
 
         S, M = a.shape
@@ -40,7 +46,7 @@ class Fast_OuterProductMean(Module):
             return (M, N)
 
         output = torch.zeros((M, N), device="cuda:0").contiguous()
-        
+
         # assert a.device == DEVICE and b.device == DEVICE and output.device == DEVICE
         a = torch.transpose(a, -1, -2).contiguous()
         b = torch.transpose(b, -1, -2).contiguous()
@@ -49,18 +55,18 @@ class Fast_OuterProductMean(Module):
         )
         return output
 
-
+    @staticmethod
     def backward(ctx, dO):
         A, B = ctx.saved_tensors
         S = A.shape[-2]
 
-        # ∇_A = 1/s ∇_O * B
-        dA = torch.matmul(dO, B) / S
+        # ∇_A = 1/s (∇_O @ B^T)^T
+        dA = (dO @ B.transpose(-1, -2)) / S
 
-        # ∇_B = 1/s (∇_O)^T * A
-        dB = torch.matmul(torch.transpose(dO, -1, -2), A) / S
+        # ∇_B = 1/s (∇_O^T @ A^T)^T
+        dB = (dO.transpose(-1, -2) @ A.transpose(-1, -2)) / S
 
-        return dA, dB
+        return dA.transpose(-1, -2), dB.transpose(-1, -2)
 
 
 @triton.jit
