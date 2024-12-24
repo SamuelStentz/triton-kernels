@@ -4,9 +4,9 @@ from torch import einsum, Tensor
 from torch.nn import Module
 
 
-class OuterProductMeanTorch(Module):
+class OuterProductMean(Module):
     """
-    Compute mean_s(a_sih ⊗ b_sjh), the mean of outer products over the sequence dimension.
+    Compute mean_s(a_si ⊗ b_sj), the mean of outer products over the sequence dimension.
 
     Args:
         a: Tensor of shape [*, s, i]
@@ -20,7 +20,5 @@ class OuterProductMeanTorch(Module):
         super().__init__()
 
     def forward(self, a: Tensor, b: Tensor) -> Tensor:
-        a = a.transpose(-1, -2)
-        b = b.transpose(-1, -2)
-        outer_products = einsum("...is,...js->...ijs", a, b)
-        return outer_products.mean(dim=-2)
+        outer_products = einsum("...si,...sj->...sij", a, b)
+        return outer_products.mean(dim=-3)
