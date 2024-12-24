@@ -23,7 +23,9 @@ class OuterProductMean(Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, a: Tensor, b: Tensor) -> Tensor:
+    def forward(self, ctx, a: Tensor, b: Tensor) -> Tensor:
+        ctx.save_for_backward(a, b)
+
         output = torch.zeros((a.size(-1), b.size(-1)))
         assert a.size(-2) == b.size(-2)
         
@@ -41,6 +43,19 @@ class OuterProductMean(Module):
 
         _mean_outer_product_fwd[grid](a, b, output, a.size(-2), BLOCK_SIZE)
         return output
+
+
+    def backward(ctx, dO):
+        A, B = ctx.saved_tensors
+        S = A.shape[-2]
+
+        # ∇_A = 1/s ∇_O * B
+        dA = torch.matmul(dO, B) / S
+
+        # ∇_B = 1/s (∇_O)^T * A
+        dB = torch.matmul(torch.transpose(dO, -1, -2), A) / S
+
+        return dA, dB
 
 
 @triton.jit
@@ -70,33 +85,3 @@ def _mean_outer_product_fwd(
     averaged_outer_product = tl.sum(outer_product, 0) / S  # (M, N)
     # TODO: How to do this sum into shared entries of output tensor.
     tl.store(averaged_outer_product, Output, mask=mask)
-
-
-@triton.jit
-def _mean_outer_product_bwd_dA(
-    DA,  # pointer to the A gradient
-    DO,  # pointer to the O gradient
-    A,  # pointer to A
-    B,  # pointer to B
-    stride,  # how much to increase the pointer when moving by 1 row
-    S,  # Averaged dimension
-    M,  # Last dimension of A
-    N,  # Last dimension of B
-    GROUP_SIZE_S: tl.constexpr,
-):
-    print("_mean_outer_product_bwd_dA unimplemented")
-
-
-@triton.jit
-def _mean_outer_product_bwd_dB(
-    DB,  # pointer to the A gradient
-    DO,  # pointer to the O gradient
-    A,  # pointer to A
-    B,  # pointer to B
-    stride,  # how much to increase the pointer when moving by 1 row
-    S,  # Averaged dimension
-    M,  # Last dimension of A
-    N,  # Last dimension of B
-    GROUP_SIZE_S: tl.constexpr,
-):
-    print("_mean_outer_product_bwd_dA unimplemented")
