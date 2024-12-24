@@ -1,39 +1,52 @@
 import torch
 
-from outer_product_mean_pytorch.outer_product_mean import (
-    OuterProductMean
-)
+from outer_product_mean_triton.outer_product_mean import Fast_OuterProductMean
+from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
 
-def test(
-):
+
+def test():
     # inputs a, b
+    A = torch.tensor(
+        [[[1, 2], [3, 4]]],  # shape [1, 3, 2]
+        dtype=torch.float32,
+        device="cuda",
+    )
+    B = torch.tensor(
+        [[[5, 6], [7, 8]]],  # shape [1, 3, 2]
+        dtype=torch.float32,
+        device="cuda",
+    )
+    dO = torch.tensor(
+        [[[9, 10], [11, 12]]],  # shape [1, 2, 2]
+        dtype=torch.float32,
+        device="cuda",
+    )
 
-    a = torch.tensor([[[[1.0, 2.0], [3.0, 4.0]]]], requires_grad=True)  # Shape: (1, 2, 2, 2)
-    b = torch.tensor([[[[5.0, 6.0], [7.0, 8.0]]]], requires_grad=True)  # Shape: (1, 2, 2, 2)
+    # kernel and regular inputs
+    KA = A.clone().requires_grad_()
+    KB = B.clone().requires_grad_()
+    RA = A.clone().requires_grad_()
+    RB = B.clone().requires_grad_()
 
     # instantiate
-
     opm = OuterProductMean()
+    kopm = Fast_OuterProductMean()
 
     # forward
-
-    o = opm(a, b)
-    print(o)
-
-    #assert torch.allclose(ro, ko, atol = 1e-6)
+    RO = opm(RA, RB)
+    KO = kopm(KA, KB)
+    assert torch.allclose(RO, KO, atol=1e-6)
 
     # backwards
+    RO.backward(dO)
+    KO.backward(dO)
+    assert torch.allclose(RA.grad, KA.grad, atol=1e-6)
+    assert torch.allclose(RB.grad, KB.grad, atol=1e-6)
 
-    o.sum().backward()
-    print(a._grad)
-    print(b._grad)
+    print(
+        "✅ outputs and gradients are same between regular and kernel mean outer product"
+    )
 
-    # TODO
-    #assert torch.allclose(rq.grad, fq.grad, atol = 1e-6)
-    #assert torch.allclose(rk.grad, fk.grad, atol = 1e-6)
-    #assert torch.allclose(rv.grad, fv.grad, atol = 1e-6)
 
-    print('✅ outputs and gradients are same between regular and kernel mean outer product')
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     test()

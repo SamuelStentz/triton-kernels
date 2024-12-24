@@ -8,39 +8,41 @@ from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
 # variables
 
 @click.command()
+@click.option('--batch', default = 16)
 @click.option('--seq-len', default = 256) # 16384
 @click.option('--m', default = 32) # 768
 @click.option('--n', default = 16) # 768
 def test(
+    batch: int,
     seq_len: int,
     m: int,
     n: int,
 ):
     # inputs a, b
-    a = torch.randn(seq_len, m).cuda()
-    b = torch.randn(seq_len, n).cuda()
-    do = torch.randn(m, n).cuda()
+    A = torch.randn(batch, seq_len, m).cuda()
+    B = torch.randn(batch, seq_len, n).cuda()
+    dO = torch.randn(batch, m, n).cuda()
 
     # kernel and regular inputs
-    ka = a.clone().requires_grad_()
-    kb = b.clone().requires_grad_()
-    ra = a.clone().requires_grad_()
-    rb = b.clone().requires_grad_()
+    KA = A.clone().requires_grad_()
+    KB = B.clone().requires_grad_()
+    RA = A.clone().requires_grad_()
+    RB = B.clone().requires_grad_()
 
     # instantiate
     opm = OuterProductMean()
     kopm = Fast_OuterProductMean()
 
     # forward
-    ro = opm(ra, rb)
-    ko = kopm(ka, kb)
-    assert torch.allclose(ro, ko, atol = 1e-6)
+    RO = opm(RA, RB)
+    KO = kopm(KA, KB)
+    assert torch.allclose(RO, KO, atol = 1e-6)
 
     # backwards
-    ro.backward(do)
-    ko.backward(do)
-    assert torch.allclose(ra.grad, ka.grad, atol = 1e-6)
-    assert torch.allclose(rb.grad, kb.grad, atol = 1e-6)
+    RO.backward(dO)
+    KO.backward(dO)
+    assert torch.allclose(RA.grad, KA.grad, atol = 1e-6)
+    assert torch.allclose(RB.grad, KB.grad, atol = 1e-6)
 
     print('✅ outputs and gradients are same between regular and kernel mean outer product')
 
