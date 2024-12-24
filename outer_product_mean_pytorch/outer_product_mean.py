@@ -20,5 +20,4 @@ class OuterProductMean(Module):
         super().__init__()
 
     def forward(self, a: Tensor, b: Tensor) -> Tensor:
-        outer_products = einsum("...si,...sj->...sij", a, b)
-        return outer_products.mean(dim=-3)
+        return (a.transpose(-2, -1) @ b) / a.size(-2)
