@@ -1,7 +1,6 @@
 import torch
 
-from outer_product_mean_triton.outer_product_mean import Fast_OuterProductMean
-from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
+from outer_product_mean.outer_product_mean import OuterProductMean
 
 
 def test():
@@ -30,11 +29,11 @@ def test():
 
     # instantiate
     opm = OuterProductMean()
-    kopm = Fast_OuterProductMean()
+    kopm = OuterProductMean()
 
     # forward
-    RO = opm(RA, RB)
-    KO = kopm(KA, KB)
+    RO = opm.forward(RA, RB)
+    KO = kopm.forward(KA, KB, use_triton_kernel=True)
     assert torch.allclose(RO, KO, atol=1e-6)
 
     # backwards

@@ -1,31 +1,7 @@
-from __future__ import annotations
-
 import torch
-from torch import Tensor
-from torch.nn import Module
 import triton
 import triton.language as tl
-
-# DEVICE = triton.runtime.driver.active.get_active_torch_device()
-
-
-class Fast_OuterProductMean(Module):
-    """
-    Compute mean_s(a_si ⊗ b_sj), the mean of outer products over the sequence dimension.
-
-    Args:
-        a: Tensor of shape [batch, s, i]
-        b: Tensor of shape [batch, s, j]
-
-    Returns:
-        Tensor of shape [batch, i, j], the mean of the outer products.
-    """
-
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, A: Tensor, B: Tensor) -> Tensor:
-        return FastOuterProductMeanFunction.apply(A, B)
+from torch import Tensor
 
 
 class FastOuterProductMeanFunction(torch.autograd.Function):
@@ -55,7 +31,13 @@ class FastOuterProductMeanFunction(torch.autograd.Function):
             B_slice = B[b]
             Output_slice = Output[b]
             _mean_outer_product_fwd[grid](
-                A_slice, B_slice, Output_slice, A_slice.stride(0), B_slice.stride(0), Output_slice.stride(0), S
+                A_slice,
+                B_slice,
+                Output_slice,
+                A_slice.stride(0),
+                B_slice.stride(0),
+                Output_slice.stride(0),
+                S,
             )
         return Output
 
