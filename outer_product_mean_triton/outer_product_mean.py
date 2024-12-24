@@ -12,23 +12,25 @@ import triton.language as tl
 class Fast_OuterProductMean(Module):
     """
     Compute mean_s(a_si ⊗ b_sj), the mean of outer products over the sequence dimension.
+    Sequence dimension must be a power of 2 and <= 65536 // element_size.
 
     Args:
-        a: Tensor of shape [s, i]
-        b: Tensor of shape [s, j]
+        a: Tensor of shape [batch, s, i]
+        b: Tensor of shape [batch, s, j]
 
     Returns:
-        Tensor of shape [i, j], the mean of the outer products.
+        Tensor of shape [batch, i, j], the mean of the outer products.
     """
 
     def __init__(self):
         super().__init__()
 
-    def forward(self, a: Tensor, b: Tensor) -> Tensor:
-        S, M = a.shape
-        S_2, N = b.shape
-        MAX_FUSED_SIZE = 65536 // a.element_size()
+    def forward(self, A: Tensor, B: Tensor) -> Tensor:
+        Batch, S, M = A.shape
+        Batch_2, S_2, N = B.shape
+        MAX_FUSED_SIZE = 65536 // A.element_size()
 
+        assert Batch == Batch_2
         assert S == S_2
         assert S == triton.next_power_of_2(S)
         assert S <= MAX_FUSED_SIZE
@@ -37,15 +39,21 @@ class Fast_OuterProductMean(Module):
         def grid(_):
             return (M, N)
 
-        output = torch.zeros((M, N), device="cuda:0").contiguous()
-        
-        # assert a.device == DEVICE and b.device == DEVICE and output.device == DEVICE
-        a = torch.transpose(a, -1, -2).contiguous()
-        b = torch.transpose(b, -1, -2).contiguous()
-        _mean_outer_product_fwd[grid](
-            a, b, output, a.stride(0), b.stride(0), output.stride(0), S
-        )
-        return output
+        Output = torch.zeros((Batch, M, N), device="cuda:0").contiguous()
+        # assert A.device == DEVICE and B.device == DEVICE and Output.device == DEVICE
+        A = torch.transpose(A, -1, -2)
+        B = torch.transpose(B, -1, -2)
+
+        # Complete every batch.
+        for b in range(Batch):
+            A_slice = A[b]
+            B_slice = A[b]
+            Output_slice = Output[b].contiguous()
+            print(f"Output_slice shape: {Output_slice.shape}")
+            _mean_outer_product_fwd[grid](
+                A_slice, B_slice, Output_slice, A_slice.stride(0), B_slice.stride(0), Output_slice.stride(0), S
+            )
+        return Output
 
 
 @triton.jit

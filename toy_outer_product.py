@@ -8,8 +8,12 @@ def test(
 ):
     # inputs a, b
 
-    a = torch.tensor([[[[1.0, 2.0], [3.0, 4.0]]]], requires_grad=True)  # Shape: (1, 2, 2, 2)
-    b = torch.tensor([[[[5.0, 6.0], [7.0, 8.0]]]], requires_grad=True)  # Shape: (1, 2, 2, 2)
+    a = torch.tensor([[1.0, 2.0],
+                      [3.0, 4.0],
+                      [5.0, 6.0]], requires_grad=True)  # Shape: (2,3)
+    a = torch.transpose(a, -1, -2).unsqueeze(0)
+    b = torch.tensor([[7.0, 8.0]], requires_grad=True)  # Shape: (2,1)
+    b = torch.transpose(b, -1, -2).unsqueeze(0)
 
     # instantiate
 
@@ -18,15 +22,20 @@ def test(
     # forward
 
     o = opm(a, b)
-    print(o)
+    o.retain_grad()
+    print(f"a {a.shape}: {a}")
+    print(f"b {b.shape}: {b}")
+    print(f"o {o.shape}: {o}")
 
-    #assert torch.allclose(ro, ko, atol = 1e-6)
+    assert torch.allclose(ro, ko, atol = 1e-6)
 
     # backwards
 
-    o.sum().backward()
-    print(a._grad)
-    print(b._grad)
+    move_o_grad = o * torch.tensor([[9.0, 10.0, 11.0]])
+    move_o_grad.sum().backward()
+    print(f"a grad: {a._grad}")
+    print(f"b grad: {b._grad}")
+    print(f"o grad: {o._grad}")
 
     # TODO
     #assert torch.allclose(rq.grad, fq.grad, atol = 1e-6)

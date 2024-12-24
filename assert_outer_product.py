@@ -8,31 +8,36 @@ from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
 # variables
 
 @click.command()
+@click.option('--batch', default = 1)
 @click.option('--seq-len', default = 16384) # 16384
 @click.option('--i', default = 16) # 768
 @click.option('--j', default = 16) # 768
 def test(
+    batch: int,
     seq_len: int,
     i: int,
     j: int,
 ):
     # inputs a, b
-    a = torch.randn(seq_len, i).cuda()
-    b = torch.randn(seq_len, j).cuda()
+    A = torch.randn(batch, seq_len, i).cuda()
+    B = torch.randn(batch, seq_len, j).cuda()
 
     # kernel and regular inputs
-    ka = a.clone().requires_grad_()
-    kb = b.clone().requires_grad_()
-    ra = a.clone().requires_grad_()
-    rb = b.clone().requires_grad_()
+    KA = A.clone().requires_grad_()
+    KB = B.clone().requires_grad_()
+    RA = A.clone().requires_grad_()
+    RB = B.clone().requires_grad_()
 
     # instantiate
     opm = OuterProductMean()
     kopm = Fast_OuterProductMean()
 
     # forward
-    ro = opm(ra, rb)
-    ko = kopm(ka, kb)
+    ko = kopm(KA, KB)
+    ro = opm(RA, RB)
+
+    print(ko.shape)
+    print(ro.shape)
     assert torch.allclose(ro, ko, atol = 1e-6)
 
     # backwards
