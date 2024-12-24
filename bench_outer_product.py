@@ -19,10 +19,10 @@ from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
         args={},
     ))
 def benchmark(seq_len, provider):
-    m, n = 128, 128
-    a = torch.rand(seq_len, m, dtype=torch.float32, device='cuda', requires_grad=True)
-    b = torch.rand(seq_len, n, dtype=torch.float32, device='cuda', requires_grad=True)
-    do = torch.rand(m, n, dtype=torch.float32, device='cuda')
+    batch, m, n = 1, 128, 128
+    A = torch.rand(batch, seq_len, m, dtype=torch.float32, device='cuda', requires_grad=True)
+    B = torch.rand(batch, seq_len, n, dtype=torch.float32, device='cuda', requires_grad=True)
+    dO = torch.rand(batch, m, n, dtype=torch.float32, device='cuda')
 
     quantiles = [0.5, 0.2, 0.8]
     def forward_backwards(opm, a, b, do):
@@ -31,12 +31,12 @@ def benchmark(seq_len, provider):
 
     if provider == 'torch':
         opm = OuterProductMean()
-        ms, min_ms, max_ms = triton.testing.do_bench(lambda: forward_backwards(opm, a, b, do), quantiles=quantiles)
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: forward_backwards(opm, A, B, dO), quantiles=quantiles)
     if provider == 'triton':
         opm = Fast_OuterProductMean()
-        ms, min_ms, max_ms = triton.testing.do_bench(lambda: forward_backwards(opm, a, b, do), quantiles=quantiles)
+        ms, min_ms, max_ms = triton.testing.do_bench(lambda: forward_backwards(opm, A, B, dO), quantiles=quantiles)
     def gbps(ms):
-        return 2 * (a.numel() + a.shape[1] * b.shape[1] + b.numel()) * a.element_size() * 1e-09 / (ms * 0.001)
+        return 2 * (A.numel() + A.shape[1] * B.shape[1] + B.numel()) * A.element_size() * 1e-09 / (ms * 0.001)
     return gbps(ms), gbps(max_ms), gbps(min_ms)
 
 

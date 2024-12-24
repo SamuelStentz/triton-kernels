@@ -14,29 +14,30 @@ class Fast_OuterProductMean(Module):
     Compute mean_s(a_si ⊗ b_sj), the mean of outer products over the sequence dimension.
 
     Args:
-        a: Tensor of shape [s, i]
-        b: Tensor of shape [s, j]
+        a: Tensor of shape [batch, s, i]
+        b: Tensor of shape [batch, s, j]
 
     Returns:
-        Tensor of shape [i, j], the mean of the outer products.
+        Tensor of shape [batch, i, j], the mean of the outer products.
     """
 
     def __init__(self):
         super().__init__()
 
-    def forward(self, a: Tensor, b: Tensor) -> Tensor:
-        return FastOuterProductMeanFunction.apply(a, b)
+    def forward(self, A: Tensor, B: Tensor) -> Tensor:
+        return FastOuterProductMeanFunction.apply(A, B)
 
 
 class FastOuterProductMeanFunction(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, a: Tensor, b: Tensor):
-        ctx.save_for_backward(a, b)
+    def forward(ctx, A: Tensor, B: Tensor):
+        ctx.save_for_backward(A, B)
 
-        S, M = a.shape
-        S_2, N = b.shape
-        MAX_FUSED_SIZE = 65536 // a.element_size()
+        Batch, S, M = A.shape
+        Batch_2, S_2, N = B.shape
+        MAX_FUSED_SIZE = 65536 // A.element_size()
 
+        assert Batch == Batch_2
         assert S == S_2
         assert S == triton.next_power_of_2(S)
         assert S <= MAX_FUSED_SIZE
@@ -45,15 +46,18 @@ class FastOuterProductMeanFunction(torch.autograd.Function):
         def grid(_):
             return (M, N)
 
-        output = torch.zeros((M, N), device="cuda").contiguous()
-
         # assert a.device == DEVICE and b.device == DEVICE and output.device == DEVICE
-        a = torch.transpose(a, -1, -2).contiguous()
-        b = torch.transpose(b, -1, -2).contiguous()
-        _mean_outer_product_fwd[grid](
-            a, b, output, a.stride(0), b.stride(0), output.stride(0), S
-        )
-        return output
+        Output = torch.zeros((Batch, M, N), device="cuda").contiguous()
+        A = torch.transpose(A, -1, -2).contiguous()
+        B = torch.transpose(B, -1, -2).contiguous()
+        for b in range(0, Batch, 1):
+            A_slice = A[b]
+            B_slice = B[b]
+            Output_slice = Output[b]
+            _mean_outer_product_fwd[grid](
+                A_slice, B_slice, Output_slice, A_slice.stride(0), B_slice.stride(0), Output_slice.stride(0), S
+            )
+        return Output
 
     @staticmethod
     def backward(ctx, dO):
