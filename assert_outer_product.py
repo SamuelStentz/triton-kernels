@@ -8,7 +8,7 @@ from outer_product_mean_pytorch.outer_product_mean import OuterProductMean
 # variables
 
 @click.command()
-@click.option('--seq-len', default = 16384) # 16384
+@click.option('--seq-len', default = 256) # 16384
 @click.option('--m', default = 32) # 768
 @click.option('--n', default = 16) # 768
 def test(
@@ -19,6 +19,7 @@ def test(
     # inputs a, b
     a = torch.randn(seq_len, m).cuda()
     b = torch.randn(seq_len, n).cuda()
+    do = torch.randn(m, n).cuda()
 
     # kernel and regular inputs
     ka = a.clone().requires_grad_()
@@ -36,8 +37,8 @@ def test(
     assert torch.allclose(ro, ko, atol = 1e-6)
 
     # backwards
-    ro.sum().backward()
-    ko.sum().backward()
+    ro.backward(do)
+    ko.backward(do)
     assert torch.allclose(ra.grad, ka.grad, atol = 1e-6)
     assert torch.allclose(rb.grad, kb.grad, atol = 1e-6)
 

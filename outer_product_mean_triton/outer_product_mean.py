@@ -45,7 +45,7 @@ class FastOuterProductMeanFunction(torch.autograd.Function):
         def grid(_):
             return (M, N)
 
-        output = torch.zeros((M, N), device="cuda:0").contiguous()
+        output = torch.zeros((M, N), device="cuda").contiguous()
 
         # assert a.device == DEVICE and b.device == DEVICE and output.device == DEVICE
         a = torch.transpose(a, -1, -2).contiguous()
