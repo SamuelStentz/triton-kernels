@@ -24,7 +24,9 @@ class Fast_OuterProductMean(Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, a: Tensor, b: Tensor) -> Tensor:
+    def forward(self, ctx, a: Tensor, b: Tensor) -> Tensor:
+        ctx.save_for_backward(a, b)
+
         S, M = a.shape
         S_2, N = b.shape
         MAX_FUSED_SIZE = 65536 // a.element_size()
@@ -46,6 +48,19 @@ class Fast_OuterProductMean(Module):
             a, b, output, a.stride(0), b.stride(0), output.stride(0), S
         )
         return output
+
+
+    def backward(ctx, dO):
+        A, B = ctx.saved_tensors
+        S = A.shape[-2]
+
+        # ∇_A = 1/s ∇_O * B
+        dA = torch.matmul(dO, B) / S
+
+        # ∇_B = 1/s (∇_O)^T * A
+        dB = torch.matmul(torch.transpose(dO, -1, -2), A) / S
+
+        return dA, dB
 
 
 @triton.jit
@@ -72,29 +87,3 @@ def _mean_outer_product_fwd(
     result = tl.sum(a * b, axis=0) / S
     o = Output + i * o_stride + j
     tl.store(o, result)
-
-
-@triton.jit
-def _mean_outer_product_bwd_dA(
-    DA,  # pointer to the A gradient
-    DO,  # pointer to the O gradient
-    A,  # pointer to first input A (M, S)
-    B,  # pointer to second input B (N, S)
-    S: tl.constexpr,
-    M: tl.constexpr,
-    N: tl.constexpr,
-):
-    print("_mean_outer_product_bwd_dA unimplemented")
-
-
-@triton.jit
-def _mean_outer_product_bwd_dB(
-    DB,  # pointer to the A gradient
-    DO,  # pointer to the O gradient
-    A,  # pointer to first input A (M, S)
-    B,  # pointer to second input B (N, S)
-    S: tl.constexpr,
-    M: tl.constexpr,
-    N: tl.constexpr,
-):
-    print("_mean_outer_product_bwd_dA unimplemented")
