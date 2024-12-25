@@ -2,7 +2,7 @@ import click
 
 import torch
 
-from outer_product_mean.outer_product_mean import OuterProductMean
+from simple_outer_product_mean.outer_product_mean import OuterProductMean
 # variables
 
 

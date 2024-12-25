@@ -2,7 +2,7 @@ import torch
 import triton
 import gc
 
-from outer_product_mean.outer_product_mean import OuterProductMean
+from simple_outer_product_mean.outer_product_mean import OuterProductMean
 
 
 @triton.testing.perf_report(

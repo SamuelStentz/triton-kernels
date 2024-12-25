@@ -3,20 +3,21 @@ from torch import Tensor
 import triton
 import gc
 
-from outer_product_mean.outer_product_mean import OuterProductMean
+from simple_outer_product_mean.outer_product_mean import OuterProductMean
 
 
 @triton.testing.perf_report(
     triton.testing.Benchmark(
         x_names=["seq_len"],
-        x_vals=[2**i for i in range(4, 16, 1)],
+        x_vals=[2**i for i in range(10, 16, 1)],
         x_log=True,
+        y_log=True,
         line_arg="provider",
         line_vals=["triton", "naive", "batched"],
         line_names=["Triton", "Baseline", "Batched"],
         styles=[("blue", "-"), ("green", "-"), ("red", "-")],
-        ylabel="Peak Memory Usage (GB)",
-        plot_name="Forward Pass Usage",
+        ylabel="Runtime (ms)",
+        plot_name="Forward Pass Performance",
         args={},
     )
 )
@@ -25,7 +26,6 @@ def benchmark(seq_len, provider):
     try:
         gc.collect()
         torch.cuda.empty_cache()
-        torch.cuda.reset_peak_memory_stats()
 
         batch, m, n = 32, 768, 768
         A = torch.rand(
@@ -36,12 +36,23 @@ def benchmark(seq_len, provider):
         )
         opm = OuterProductMean()
 
+        quantiles = [0.5, 0.2, 0.8]
+
         if provider == "naive":
-            opm.forward(A, B)
+            ms, min_ms, max_ms = triton.testing.do_bench(
+                lambda: forward(opm, A, B),  # noqa: F821
+                quantiles=quantiles,
+            )
         if provider == "triton":
-            opm.forward(A, B, use_triton_kernel=True)
+            ms, min_ms, max_ms = triton.testing.do_bench(
+                lambda: forward(opm, A, B, use_triton_kernel=True),  # noqa: F821
+                quantiles=quantiles,
+            )
         if provider == "batched":
-            opm.forward(A, B, use_batched_matmul=True)
+            ms, min_ms, max_ms = triton.testing.do_bench(
+                lambda: forward(opm, A, B, use_batched_matmul=True),  # noqa: F821
+                quantiles=quantiles,
+            )
     except Exception as e:
         print(e)
         return float("nan"), float("nan"), float("nan")
@@ -50,8 +61,7 @@ def benchmark(seq_len, provider):
     del B
     del opm
 
-    peak_memory = torch.cuda.max_memory_allocated() / 2**30
-    return peak_memory
+    return ms, max_ms, min_ms
 
 
 def forward(
