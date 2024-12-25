@@ -10,6 +10,7 @@ from outer_product_mean.outer_product_mean import OuterProductMean
         x_names=["seq_len"],
         x_vals=[2**i for i in range(10, 16, 1)],
         x_log=True,
+        y_log=True,
         line_arg="provider",
         line_vals=["triton", "naive", "batched"],
         line_names=["Triton", "Baseline", "Batched"],
@@ -37,21 +38,21 @@ def benchmark(seq_len, provider):
         quantiles = [0.5, 0.2, 0.8]
 
         if provider == "naive":
-            O = opm(A, B)  # noqa: E741
+            O = opm.forward(A, B)  # noqa: E741
             ms, min_ms, max_ms = triton.testing.do_bench(
-                lambda: O.backward(dO, retain_graph = True),  # noqa: F821
+                lambda: O.backward(dO, retain_graph=True),  # noqa: F821
                 quantiles=quantiles,
             )
         if provider == "triton":
-            O = opm(A, B) # noqa: E741
+            O = opm.forward(A, B, use_triton_kernel=True)  # noqa: E741
             ms, min_ms, max_ms = triton.testing.do_bench(
-                lambda: O.backward(dO, retain_graph = True),  # noqa: F821
+                lambda: O.backward(dO, retain_graph=True),  # noqa: F821
                 quantiles=quantiles,
             )
         if provider == "batched":
-            O = opm(A, B) # noqa: E741
+            O = opm.forward(A, B, use_batched_matmul=True)  # noqa: E741
             ms, min_ms, max_ms = triton.testing.do_bench(
-                lambda: O.backward(dO, retain_graph = True),  # noqa: F821
+                lambda: O.backward(dO, retain_graph=True),  # noqa: F821
                 quantiles=quantiles,
             )
     except Exception as e:

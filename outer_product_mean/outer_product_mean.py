@@ -41,9 +41,13 @@ class OuterProductMean(Module):
         return self._naive(A, B)
 
     def _naive(self, A: Tensor, B: Tensor) -> Tensor:
-        return torch.bmm(A.transpose(-2, -1), B) / A.size(-2)
+        return torch.einsum("...sm,...sn->...smn", A, B).mean(axis=-2)
 
     def _batched_matmul(self, A: Tensor, B: Tensor) -> Tensor:
+        return torch.bmm(A.transpose(-2, -1), B) / A.size(-2)
+
+    # Experimentally found to be no better than _batched_matmul.
+    def _doubly_batched_matmul(self, A: Tensor, B: Tensor) -> Tensor:
         Batch, S, M = A.shape
         _, _, N = B.shape
 
