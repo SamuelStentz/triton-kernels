@@ -2,7 +2,7 @@ import click
 
 import torch
 
-from outer_product_mean.outer_product_mean import OuterProductMean
+from simple_outer_product_mean.outer_product_mean import OuterProductMean
 # variables
 
 
@@ -46,7 +46,6 @@ def test(
     print(
         "✅ outputs and gradients are same between regular and kernel mean outer product"
     )
-
 
 if __name__ == "__main__":
     test()
